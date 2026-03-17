@@ -1,10 +1,11 @@
 """
-Quant Hedgefund Dashboard — Streamlit App
-==========================================
-Adaptive Multi-Strategy Ensemble for Global Asset Allocation
+BSQuant Dashboard — Streamlit App
+===================================
+Multi-Strategy Ensemble for Global Asset Allocation
+by Bosun Yeum
 
 Usage:
-    streamlit run caa_dashboard.py
+    streamlit run bsquant_dashboard.py
 
 Requirements:
     pip install streamlit plotly pandas numpy yfinance pandas_datareader
@@ -20,7 +21,7 @@ from datetime import datetime
 import time
 
 # Import CAA engine
-from caa_strategy import (
+from bsquant_strategy import (
     download_prices, download_unemployment_rate, get_month_end_dates,
     strategy_baa, strategy_faa, strategy_raa, strategy_paa, strategy_laa, strategy_haa,
     combine_caa, create_leveraged_prices, backtest, calc_performance,
@@ -29,7 +30,7 @@ from caa_strategy import (
 
 # ─── Page Config ───
 st.set_page_config(
-    page_title="Quant Hedgefund Dashboard — PRISM",
+    page_title="BSQuant Dashboard",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -43,16 +44,12 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Expander */
-    [data-testid="stExpander"] summary {
+    /* Expander - white text on dark bar */
+    .streamlit-expanderHeader {
         color: #FFFFFF !important;
-        background: #1E293B !important;
-        border-radius: 8px;
-        padding: 12px 16px;
     }
-    [data-testid="stExpander"] summary span,
-    [data-testid="stExpander"] summary p,
-    [data-testid="stExpander"] summary svg {
+    .streamlit-expanderHeader p, .streamlit-expanderHeader span,
+    .streamlit-expanderHeader svg {
         color: #FFFFFF !important;
         fill: #FFFFFF !important;
     }
@@ -204,36 +201,6 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 1.2px;
     }
-            
-    /* Deploy button - dark text on light header */
-    [data-testid="stHeader"] {
-        background: #F8FAFC !important;
-    }
-    [data-testid="stHeader"] * {
-        color: #0F172A !important;
-    }
-
-    /* Download button - white text */
-    [data-testid="stDownloadButton"] button {
-        color: #FFFFFF !important;
-        background: #2563EB !important;
-        border: none !important;
-    }
-    [data-testid="stDownloadButton"] button:hover {
-        background: #1D4ED8 !important;
-    }
-    
-                /* DataFrame toolbar - search bar and icons */
-    [data-testid="stDataFrame"] [data-testid="stDataFrameToolbar"],
-    [data-testid="stDataFrame"] input,
-    [data-testid="stDataFrame"] button {
-        color: #FFFFFF !important;
-        background: #1E293B !important;
-    }
-    [data-testid="stDataFrame"] svg {
-        fill: #FFFFFF !important;
-        stroke: #FFFFFF !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -282,7 +249,7 @@ def load_data(start_date, backtest_start):
         lev_prices = create_leveraged_prices(prices, leverage=lev)
         bt_lev = lev_prices[lev_prices.index >= backtest_start]
         eq_l, _ = backtest(bt_lev, w_caa, bt_rebal, commission_pct=commission)
-        leverage_eq[f'PRISM {lev}x'] = eq_l
+        leverage_eq[f'BSQ {lev}x'] = eq_l
 
     return {
         'prices': prices,
@@ -305,7 +272,7 @@ def build_perf_table(data):
     rows = []
     eq = data['eq_caa']
     ret = data['ret_caa']
-    rows.append(calc_performance(eq, ret, 'PRISM 1x'))
+    rows.append(calc_performance(eq, ret, 'BSQ 1x'))
 
     for name, s in data['strategies'].items():
         rows.append(calc_performance(s['equity'], s['returns'], name))
@@ -369,13 +336,14 @@ def weight_history_df(w_caa, rebal_dates):
 
 # ─── Plotly Chart Builders ───
 COLORS = {
-    'PRISM 1x': '#3B82F6', 'PRISM 2x': '#06B6D4', 'PRISM 3x': '#8B5CF6',
+    'BSQ 1x': '#3B82F6', 'BSQ 2x': '#06B6D4', 'BSQ 3x': '#8B5CF6',
     'S&P500': '#EF4444', 'US LT Bond': '#94A3B8',
     'BAA': '#F59E0B', 'FAA': '#10B981', 'RAA': '#8B5CF6',
     'PAA': '#3B82F6', 'LAA': '#D97706', 'HAA': '#EF4444',
 }
 ASSET_COLORS = {
-    'SPY': '#EF4444', 'VGK': '#3B82F6', 'FXI': '#F59E0B', 'EWY': '#10B981',
+    'SPY': '#EF4444', 'QQQ': '#7C3AED', 'SMH': '#EC4899', 
+    'VGK': '#3B82F6', 'FXI': '#F59E0B', 'EWY': '#10B981', 'IEMG': '#14B8A6',
     'USDU': '#8B5CF6', 'GLD': '#EAB308', 'PDBC': '#D97706',
     'TLT': '#06B6D4', 'IEF': '#6366F1', 'BIL': '#94A3B8',
 }
@@ -405,7 +373,7 @@ def chart_cumulative(data, show_leverage=False, show_individual=False):
 
     # Core: CAA, SPY, TLT
     for name, eq, dash in [
-        ('PRISM 1x', data['eq_caa'], None),
+        ('BSQ 1x', data['eq_caa'], None),
         ('S&P500', data['spy_eq'], 'dot'),
         ('US LT Bond', data['tlt_eq'], 'dash'),
     ]:
@@ -448,7 +416,7 @@ def chart_drawdown(data):
     fig = go.Figure()
 
     for name, eq, color in [
-        ('PRISM', data['eq_caa'], COLORS['PRISM 1x']),
+        ('BSQ', data['eq_caa'], COLORS['BSQ 1x']),
         ('S&P500', data['spy_eq'], COLORS['S&P500']),
     ]:
         dd = (eq / eq.cummax() - 1) * 100
@@ -501,7 +469,7 @@ def chart_annual_bars(annual_df, strategies_to_show):
     fig = go.Figure()
     for col in strategies_to_show:
         if col in annual_df.columns:
-            colors = [COLORS.get('PRISM 1x') if v >= 0 else COLORS.get('S&P500') for v in annual_df[col].fillna(0)]
+            colors = [COLORS.get('BSQ 1x') if v >= 0 else COLORS.get('S&P500') for v in annual_df[col].fillna(0)]
             fig.add_trace(go.Bar(
                 x=annual_df.index, y=annual_df[col],
                 name=col,
@@ -521,10 +489,19 @@ def chart_annual_bars(annual_df, strategies_to_show):
 
 
 def style_monthly_table(df):
-    """Color-code monthly returns with RdYlGn gradient (same as annual table)."""
-    return df.style.format('{:.1f}', na_rep='—').background_gradient(
-        cmap='RdYlGn', vmin=-8, vmax=8, axis=None
-    )
+    """Color-code monthly returns: green for positive, red for negative."""
+    def color_cell(val):
+        if pd.isna(val):
+            return 'color: #CBD5E1; background-color: #F8FAFC;'
+        elif val > 0:
+            intensity = min(abs(val) / 8.0, 1.0)
+            return f'color: #064E3B; background-color: rgba(16, 185, 129, {0.08 + intensity * 0.3});'
+        elif val < 0:
+            intensity = min(abs(val) / 8.0, 1.0)
+            return f'color: #7F1D1D; background-color: rgba(239, 68, 68, {0.08 + intensity * 0.3});'
+        else:
+            return 'color: #64748B; background-color: #FFFFFF;'
+    return df.style.applymap(color_cell).format('{:.1f}', na_rep='—')
 
 
 # ─── SIDEBAR ───
@@ -542,15 +519,15 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📋 Strategy Info")
     st.markdown("""
-    **PRISM Engine** — 6 Modules:
-    - 🔴 **Regime Detection** — Cross-asset momentum regime switching
-    - 📊 **Multi-Factor Selection** — Return / Volatility / Correlation scoring
-    - 🌍 **Macro Cycle Signal** — Economic indicator-based allocation
-    - 🛡️ **Drawdown Protection** — Breadth momentum tail risk management
-    - ⚓ **Structural Hedge** — Permanent portfolio with dual-side hedging
-    - 🌡️ **Inflation Regime Switch** — Real yield signal-driven rotation
+    **BSQuant** = 6 sub-strategies combined:
+    - **BAA** — Bold Asset Allocation
+    - **FAA** — Flexible Asset Allocation
+    - **RAA** — Resilient Asset Allocation
+    - **PAA** — Protective Asset Allocation
+    - **LAA** — Lethargic Asset Allocation
+    - **HAA** — Hybrid Asset Allocation
 
-    **Universe**: 10 global ETFs
+    **Universe**: 13 global ETFs
 
     **Rebalancing**: Monthly (EOM)
 
@@ -573,13 +550,13 @@ last_date = data['eq_caa'].index[-1].strftime('%Y-%m-%d')
 # ─── HEADER ───
 st.markdown(f"""
 <div class="dashboard-header">
-    <p class="dashboard-title">📊 Quant Hedgefund Dashboard</p>
-    <p class="dashboard-subtitle">PRISM — Adaptive Multi-Strategy Ensemble &nbsp;|&nbsp; Data through {last_date} &nbsp;|&nbsp; Backtest from {start_year}</p>
+    <p class="dashboard-title">📊 BSQuant Dashboard</p>
+    <p class="dashboard-subtitle">Multi-Strategy Ensemble for Global Asset Allocation &nbsp;|&nbsp; Data through {last_date} &nbsp;|&nbsp; Backtest from {start_year}</p>
 </div>
 """, unsafe_allow_html=True)
 
 # ─── KPI CARDS ───
-caa_perf = perf.loc['PRISM 1x'] if 'PRISM 1x' in perf.index else perf.iloc[0]
+caa_perf = perf.loc['BSQ 1x'] if 'BSQ 1x' in perf.index else perf.iloc[0]
 spy_perf = perf.loc['S&P500'] if 'S&P500' in perf.index else None
 
 cols = st.columns(5)
@@ -676,7 +653,7 @@ with tab1:
 
 # ── Tab 2: Annual Returns ──
 with tab2:
-    equity_dict = {'PRISM 1x': data['eq_caa'], 'S&P500': data['spy_eq']}
+    equity_dict = {'BSQ 1x': data['eq_caa'], 'S&P500': data['spy_eq']}
     for name, s in data['strategies'].items():
         equity_dict[name] = s['equity']
     for lev_name, eq_l in data['leverage_eq'].items():
@@ -685,13 +662,13 @@ with tab2:
     annual_df = annual_returns_df(equity_dict)
 
     # Bar chart
-    bar_strategies = ['PRISM 1x', 'S&P500']
+    bar_strategies = ['BSQ 1x', 'S&P500']
     if leverage_option == '2x':
-        bar_strategies.append('PRISM 2x')
+        bar_strategies.append('BSQ 2x')
     elif leverage_option == '3x':
-        bar_strategies.append('PRISM 3x')
+        bar_strategies.append('BSQ 3x')
     elif leverage_option == 'All':
-        bar_strategies.extend(['PRISM 2x', 'PRISM 3x'])
+        bar_strategies.extend(['BSQ 2x', 'BSQ 3x'])
 
     fig_annual = chart_annual_bars(annual_df, bar_strategies)
     st.plotly_chart(fig_annual, width="stretch")
@@ -705,18 +682,18 @@ with tab2:
 
 # ── Tab 3: Monthly Returns ──
 with tab3:
-    st.markdown("#### PRISM 1x Monthly Returns (%)")
+    st.markdown("#### BSQ 1x Monthly Returns (%)")
     mr_caa = monthly_returns_df(data['eq_caa'])
     st.dataframe(style_monthly_table(mr_caa), width="stretch", height=600)
 
-    if leverage_option in ['2x', 'All'] and 'PRISM 2x' in data['leverage_eq']:
-        st.markdown("#### PRISM 2x Monthly Returns (%)")
-        mr_2x = monthly_returns_df(data['leverage_eq']['PRISM 2x'])
+    if leverage_option in ['2x', 'All'] and 'BSQ 2x' in data['leverage_eq']:
+        st.markdown("#### BSQ 2x Monthly Returns (%)")
+        mr_2x = monthly_returns_df(data['leverage_eq']['BSQ 2x'])
         st.dataframe(style_monthly_table(mr_2x), width="stretch", height=600)
 
-    if leverage_option in ['3x', 'All'] and 'PRISM 3x' in data['leverage_eq']:
-        st.markdown("#### PRISM 3x Monthly Returns (%)")
-        mr_3x = monthly_returns_df(data['leverage_eq']['PRISM 3x'])
+    if leverage_option in ['3x', 'All'] and 'BSQ 3x' in data['leverage_eq']:
+        st.markdown("#### BSQ 3x Monthly Returns (%)")
+        mr_3x = monthly_returns_df(data['leverage_eq']['BSQ 3x'])
         st.dataframe(style_monthly_table(mr_3x), width="stretch", height=600)
 
 # ── Tab 4: MP Weights History ──
@@ -751,7 +728,7 @@ with tab4:
 # ─── FOOTER ───
 st.markdown(f"""
 <div style="text-align:center; padding:30px; color:#94A3B8; font-size:11px; font-family:'JetBrains Mono',monospace;">
-    Quant Hedgefund Dashboard v1.0 &nbsp;|&nbsp; BS — Adaptive Multi-Strategy Ensemble
+    BSQuant Dashboard v1.0 &nbsp;|&nbsp; Multi-Strategy Ensemble by Bosun Yeum
     <br>Data: Yahoo Finance &nbsp;|&nbsp; Last updated: {last_date}
     <br>⚠️ This is a research tool, not investment advice.
 </div>

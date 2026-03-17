@@ -1,20 +1,14 @@
 """
-CAA (Combination of Asset Allocation) — Python Implementation
-==============================================================
-Based on: DB금융투자 "자산배분의 다음 단계" (2023.04.03, 강현기)
+BSQuant Strategy Engine
+========================
+Multi-Strategy Ensemble for Global Asset Allocation
+by Bosun Yeum
 
-6 strategies combined with equal weight (1/6):
-  1. BAA (Bold Asset Allocation)
-  2. FAA (Flexible Asset Allocation)
-  3. RAA (Resilient Asset Allocation)
-  4. PAA (Protective Asset Allocation)
-  5. LAA (Lethargic Asset Allocation)
-  6. HAA (Hybrid Asset Allocation)
+13 core assets:
+  Risk:  SPY, QQQ, SMH, VGK, FXI, EWY, IEMG  (7)
+  Safe:  USDU, GLD, PDBC, TLT, IEF, BIL        (6)
 
-Unified Universe (10 assets + 5 canary/timing):
-  Risk:  SPY, VGK, FXI, EWY
-  Safe:  USDU, GLD, PDBC, TLT, IEF, BIL
-  Canary: SPY(=R1), VEA, VWO, BND, TIP
+6 sub-strategies combined with equal weight (1/6).
 """
 
 import numpy as np
@@ -37,38 +31,44 @@ print(f"[INFO] yfinance version: {yf.__version__}")
 # Order: [primary ETF, fallback1, fallback2, ...]
 # Download tries each in order; splices earlier data from later tickers in the chain.
 TICKER_CHAIN = {
-    # --- 10 Core Assets ---
-    'SPY':  ['SPY', 'VFINX'],               # R1: 미국 주식
-    'VGK':  ['VGK', 'VEURX'],               # R2: 유럽 주식
-    'FXI':  ['FXI', 'VEIEX'],               # R3: 중국 주식
-    'EWY':  ['EWY', 'VEIEX'],               # R4: 한국 주식
-    'USDU': ['USDU', 'DX-Y.NYB', 'DX=F', 'UUP'],  # S1: 달러 (multiple fallbacks for reliability)
+    # --- 13 Core Assets ---
+    'SPY':  ['SPY', 'VFINX'],               # R1: 미국 대형주
+    'QQQ':  ['QQQ', 'QQQM', 'ONEQ'],        # R2: 나스닥 100
+    'SMH':  ['SMH', 'SOXX', 'XSD'],          # R3: 반도체 (SMH > SOXX 유동성)
+    'VGK':  ['VGK', 'VEURX'],               # R4: 유럽 주식
+    'FXI':  ['FXI', 'VEIEX'],               # R5: 중국 주식
+    'EWY':  ['EWY', 'VEIEX'],               # R6: 한국 주식
+    'IEMG': ['IEMG', 'EEM', 'VEIEX'],       # R7: 이머징 마켓 (IEMG > EEM 비용)
+    'USDU': ['USDU', 'DX-Y.NYB', 'DX=F', 'UUP'],  # S1: 달러
     'GLD':  ['GLD', 'FKRCX'],               # S2: 금
-    'PDBC': ['PDBC', 'PCRAX', 'CVX'],       # S3: 원자재 (3단계 chain)
-    'TLT':  ['TLT', 'VUSTX', 'EDV'],           # S4: 미국 장기국채 (EDV = Vanguard Extended Duration)
+    'PDBC': ['PDBC', 'PCRAX', 'CVX'],       # S3: 원자재
+    'TLT':  ['TLT', 'VGLT', 'VUSTX', 'EDV'],  # S4: 미국 장기국채
     'IEF':  ['IEF', 'VFITX'],               # S5: 미국 중기국채
     'BIL':  ['BIL', 'VFISX'],               # S6: 미국 초단기국채
     # --- Canary / Timing ---
-    'VEA':  ['VEA', 'VTMGX', 'FDIVX'],      # Z2: 선진국 주식 (3단계)
-    'VWO':  ['VWO', 'VEIEX'],               # Z3: 신흥국 주식
-    'BND':  ['BND', 'VBMFX'],               # Z4: 미국 종합채권
-    'TIP':  ['TIP', 'VIPSX', 'LSGSX'],      # Z5: 미국 물가연동채 (3단계)
+    'VEA':  ['VEA', 'VTMGX', 'FDIVX'],
+    'VWO':  ['VWO', 'VEIEX'],
+    'BND':  ['BND', 'VBMFX'],
+    'TIP':  ['TIP', 'VIPSX', 'LSGSX'],
 }
 
 # Leverage ETF mapping
 LEVERAGE_2X = {
-    'SPY': 'SSO', 'VGK': 'UPV', 'FXI': 'XPP', 'EWY': 'EET',
+    'SPY': 'SSO', 'QQQ': 'QLD', 'SMH': 'USD',  # USD = ProShares Ultra Semiconductors
+    'VGK': 'UPV', 'FXI': 'XPP', 'EWY': 'EET', 'IEMG': 'EET',
     'USDU': 'USDU', 'GLD': 'GLD', 'PDBC': 'PDBC',  # 1x 유지 (PTP 회피)
-    'TLT': 'UBT', 'IEF': 'UST', 'BIL': 'BIL',       # BIL 1x 유지
+    'TLT': 'UBT', 'IEF': 'UST', 'BIL': 'BIL',
 }
 LEVERAGE_3X = {
-    'SPY': 'SPXL', 'VGK': 'EURL', 'FXI': 'YINN', 'EWY': 'EDC',
+    'SPY': 'SPXL', 'QQQ': 'TQQQ', 'SMH': 'SOXL',
+    'VGK': 'EURL', 'FXI': 'YINN', 'EWY': 'EDC', 'IEMG': 'EDC',
     'USDU': 'USDU', 'GLD': 'GLD', 'PDBC': 'PDBC',
     'TLT': 'TMF', 'IEF': 'TYD', 'BIL': 'BIL',
 }
 
-CORE_ASSETS = ['SPY', 'VGK', 'FXI', 'EWY', 'USDU', 'GLD', 'PDBC', 'TLT', 'IEF', 'BIL']
-RISK_ASSETS = ['SPY', 'VGK', 'FXI', 'EWY']
+CORE_ASSETS = ['SPY', 'QQQ', 'SMH', 'VGK', 'FXI', 'EWY', 'IEMG',
+               'USDU', 'GLD', 'PDBC', 'TLT', 'IEF', 'BIL']
+RISK_ASSETS = ['SPY', 'QQQ', 'SMH', 'VGK', 'FXI', 'EWY', 'IEMG']
 SAFE_ASSETS = ['USDU', 'GLD', 'PDBC', 'TLT', 'IEF']
 CANARY_TICKERS = ['VEA', 'VWO', 'BND', 'TIP']
 ALL_TICKERS = CORE_ASSETS + CANARY_TICKERS
@@ -302,8 +302,8 @@ def strategy_baa(prices, rebal_dates):
     - All canary 13612W > 0 → Risk 100%
     - Any canary 13612W <= 0 → Safe 100%
     
-    Risk: Top 2 of (SPY, VGK, FXI, EWY) by mom_3612, equal weight
-    Safe: Top 3 of (USDU, GLD, PDBC, TLT, IEF) by price/SMA(120)
+    Risk: Top 3 of RISK_ASSETS by mom_3612, equal weight
+    Safe: Top 3 of SAFE_ASSETS by price/SMA(120)
           If selected safe has SMA ratio < 1, replace with BIL
     """
     weights = pd.DataFrame(0.0, index=prices.index, columns=CORE_ASSETS)
@@ -317,7 +317,7 @@ def strategy_baa(prices, rebal_dates):
     # Risk asset scores
     risk_prices = prices[RISK_ASSETS]
     risk_scores = mom_3612(risk_prices)
-    risk_weights = ntop(risk_scores, 2)  # Top 2, equal weight
+    risk_weights = ntop(risk_scores, 3)  # Top 3 (expanded from 2)
 
     # Safe asset scores
     safe_prices = prices[SAFE_ASSETS]
@@ -427,7 +427,7 @@ def strategy_raa(prices, rebal_dates, unrate):
     """
     Strategy #3: Resilient Asset Allocation (RAA)
     
-    Offensive (All Seasons): 40% SPY + 20% IEF + 20% TLT + 20% GLD
+    Offensive (All Seasons+): 25% SPY + 15% QQQ + 20% IEF + 20% TLT + 20% GLD
     Defensive: 50% IEF + 50% TLT
     
     Switch condition:
@@ -469,8 +469,9 @@ def strategy_raa(prices, rebal_dates, unrate):
             weights.loc[dt, 'IEF'] = 0.50
             weights.loc[dt, 'TLT'] = 0.50
         else:
-            # Offensive (All Seasons)
-            weights.loc[dt, 'SPY'] = 0.40
+            # Offensive (All Seasons+ with QQQ)
+            weights.loc[dt, 'SPY'] = 0.25
+            weights.loc[dt, 'QQQ'] = 0.15
             weights.loc[dt, 'IEF'] = 0.20
             weights.loc[dt, 'TLT'] = 0.20
             weights.loc[dt, 'GLD'] = 0.20
@@ -536,7 +537,7 @@ def strategy_laa(prices, rebal_dates, unrate):
     """
     Strategy #5: Lethargic Asset Allocation (LAA)
     
-    Offensive Permanent: 50% SPY + 25% GLD + 25% TLT
+    Offensive Permanent: 25% SPY + 25% QQQ + 25% GLD + 25% TLT
     Defensive Permanent: 25% SPY + 25% GLD + 25% TLT + 25% BIL
     
     Growth Timing: UNRATE < UNRATE(2 months ago) → improving
@@ -576,7 +577,8 @@ def strategy_laa(prices, rebal_dates, unrate):
             weights.loc[dt, 'BIL'] = 0.25
         else:
             # Offensive
-            weights.loc[dt, 'SPY'] = 0.50
+            weights.loc[dt, 'SPY'] = 0.25
+            weights.loc[dt, 'QQQ'] = 0.25
             weights.loc[dt, 'GLD'] = 0.25
             weights.loc[dt, 'TLT'] = 0.25
 
@@ -592,7 +594,7 @@ def strategy_haa(prices, rebal_dates):
     Momentum = 1M + 3M + 6M + 12M
     
     TIP momentum > 0 → Invest 100%
-      → Top 4 from (SPY, VGK, FXI, EWY, USDU, GLD, PDBC, TLT), equal weight
+      → Top 5 from (SPY, QQQ, SMH, VGK, FXI, EWY, IEMG, USDU, GLD, PDBC, TLT), equal weight
     TIP momentum <= 0 → Safe 100%
       → Top 1 from (IEF, BIL)
     """
@@ -601,8 +603,8 @@ def strategy_haa(prices, rebal_dates):
     # TIP canary
     tip_mom = mom_13612(prices[['TIP']])['TIP']
 
-    # Invest universe: 8 assets
-    invest_assets = ['SPY', 'VGK', 'FXI', 'EWY', 'USDU', 'GLD', 'PDBC', 'TLT']
+    # Invest universe: 11 assets (expanded)
+    invest_assets = ['SPY', 'QQQ', 'SMH', 'VGK', 'FXI', 'EWY', 'IEMG', 'USDU', 'GLD', 'PDBC', 'TLT']
     invest_prices = prices[invest_assets]
     invest_scores = mom_13612(invest_prices)
 
@@ -841,8 +843,8 @@ def run_caa(start_date='1996-01-01', backtest_start='1997-02-01', commission=0.0
         commission: Transaction cost (default 0.21% per the report)
     """
     print("=" * 70)
-    print("CAA (Combination of Asset Allocation) — Python Implementation")
-    print("Based on DB금융투자 Report (2023.04.03)")
+    print("BSQuant Strategy Engine — Multi-Strategy Ensemble")
+    print("Universe: SPY, QQQ, SMH, VGK, FXI, EWY, IEMG + Safe Assets")
     print("=" * 70)
 
     # --- Step 1: Download Data ---
