@@ -693,11 +693,12 @@ with st.expander("🔔 Current Signal (Latest Rebalancing)", expanded=True):
 
 # ─── MAIN TABS ───
 st.markdown("<br>", unsafe_allow_html=True)
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📈 Cumulative Performance",
     "📊 Annual Returns (%)",
     "📅 Monthly Returns (%)",
     "⚖️ MP Weights History",
+    "🔍 Strategy Detail",
 ])
 
 # ── Tab 1: Cumulative Performance ──
