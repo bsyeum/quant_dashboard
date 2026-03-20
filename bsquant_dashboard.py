@@ -44,15 +44,23 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Expander - white text on dark bar */
-    .streamlit-expanderHeader {
+    /* Expander - white text on dark bar (updated selector) */
+    [data-testid="stExpander"] summary {
         color: #FFFFFF !important;
+        background: #1E293B !important;
+        border-radius: 8px;
+        padding: 12px 16px;
     }
-    .streamlit-expanderHeader p, .streamlit-expanderHeader span,
-    .streamlit-expanderHeader svg {
+    [data-testid="stExpander"] summary span,
+    [data-testid="stExpander"] summary p,
+    [data-testid="stExpander"] summary svg {
         color: #FFFFFF !important;
         fill: #FFFFFF !important;
     }
+
+    /* Header bar - visible Deploy button */
+    [data-testid="stHeader"] { background: #F8FAFC !important; }
+    [data-testid="stHeader"] * { color: #0F172A !important; }
 
     .stApp {
         background: #F8FAFC;
@@ -111,9 +119,40 @@ st.markdown("""
     }
 
     /* Expander content */
-    .streamlit-expanderContent {
+    .streamlit-expanderContent, [data-testid="stExpander"] > div {
         color: #1E293B !important;
     }
+
+    /* Selectbox / dropdown - force dark text */
+    [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] div {
+        color: #1E293B !important;
+    }
+
+    /* Download button - white text on blue */
+    [data-testid="stDownloadButton"] button {
+        color: #FFFFFF !important;
+        background: #2563EB !important;
+        border: none !important;
+    }
+    [data-testid="stDownloadButton"] button:hover {
+        background: #1D4ED8 !important;
+    }
+
+    /* DataFrame toolbar - search bar icons */
+    [data-testid="stDataFrame"] [data-testid="stDataFrameToolbar"],
+    [data-testid="stDataFrame"] input,
+    [data-testid="stDataFrame"] button {
+        color: #FFFFFF !important;
+        background: #1E293B !important;
+    }
+    [data-testid="stDataFrame"] svg {
+        fill: #FFFFFF !important;
+        stroke: #FFFFFF !important;
+    }
+
+    /* Plotly chart text - force readable */
+    .js-plotly-plot .plotly text { fill: #334155 !important; }
 
     /* Metric cards */
     .metric-card {
@@ -201,6 +240,21 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 1.2px;
     }
+            
+    /* Sidebar selectbox value - light text */
+    [data-testid="stSidebar"] [data-baseweb="select"] span,
+    [data-testid="stSidebar"] [data-baseweb="select"] div,
+    [data-testid="stSidebar"] [data-baseweb="select"] input {
+        color: #E2E8F0 !important;
+        -webkit-text-fill-color: #E2E8F0 !important;
+    }
+
+    /* Markdown headers - force dark text on main area */
+    .stMarkdown h4, .stMarkdown h3, .stMarkdown h2 {
+        color: #0F172A !important;
+    }
+
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -340,6 +394,20 @@ COLORS = {
     'S&P500': '#EF4444', 'US LT Bond': '#94A3B8',
     'BAA': '#F59E0B', 'FAA': '#10B981', 'RAA': '#8B5CF6',
     'PAA': '#3B82F6', 'LAA': '#D97706', 'HAA': '#EF4444',
+}
+
+# Strategy display names (hide internal strategy codes)
+STRATEGY_DISPLAY = {
+    'BAA': '🔴 Regime Detection',
+    'FAA': '📊 Multi-Factor',
+    'RAA': '🌍 Macro Cycle',
+    'PAA': '🛡️ Drawdown Shield',
+    'LAA': '⚓ Structural Hedge',
+    'HAA': '🌡️ Inflation Switch',
+}
+STRATEGY_SHORT = {
+    'BAA': 'RD', 'FAA': 'MF', 'RAA': 'MC',
+    'PAA': 'DS', 'LAA': 'SH', 'HAA': 'IS',
 }
 ASSET_COLORS = {
     'SPY': '#EF4444', 'QQQ': '#7C3AED', 'SMH': '#EC4899', 
@@ -519,13 +587,13 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📋 Strategy Info")
     st.markdown("""
-    **BSQuant** = 6 sub-strategies combined:
-    - **BAA** — Bold Asset Allocation
-    - **FAA** — Flexible Asset Allocation
-    - **RAA** — Resilient Asset Allocation
-    - **PAA** — Protective Asset Allocation
-    - **LAA** — Lethargic Asset Allocation
-    - **HAA** — Hybrid Asset Allocation
+    **BSQuant Engine** — 6 Modules:
+    - 🔴 **Regime Detection** — Cross-asset momentum regime switching
+    - 📊 **Multi-Factor** — Return / Volatility / Correlation scoring
+    - 🌍 **Macro Cycle** — Economic indicator-based allocation
+    - 🛡️ **Drawdown Shield** — Breadth momentum tail risk management
+    - ⚓ **Structural Hedge** — Permanent portfolio with dual-side hedging
+    - 🌡️ **Inflation Switch** — Real yield signal-driven rotation
 
     **Universe**: 13 global ETFs
 
@@ -588,6 +656,7 @@ with st.expander("🔔 Current Signal (Latest Rebalancing)", expanded=True):
     strategy_names = ['BAA', 'FAA', 'RAA', 'PAA', 'LAA', 'HAA']
     for i, (name, sc) in enumerate(zip(strategy_names, signal_cols)):
         w = data['strategies'][name]['weights']
+        display_name = STRATEGY_DISPLAY.get(name, name)
         if latest_rebal in w.index:
             row = w.loc[latest_rebal]
             active = row[row > 0.001].sort_values(ascending=False)
@@ -598,7 +667,7 @@ with st.expander("🔔 Current Signal (Latest Rebalancing)", expanded=True):
             with sc:
                 st.markdown(f"""
                 <div class="signal-box">
-                    <div class="signal-title">{name}</div>
+                    <div class="signal-title">{display_name}</div>
                     <span class="strategy-badge {badge_class}">{regime}</span>
                     <div style="font-size:11px; color:#64748B; margin-top:6px;">{positions}</div>
                 </div>
@@ -636,11 +705,11 @@ with tab1:
     show_lev = leverage_option in ['2x', '3x', 'All']
 
     fig_cum = chart_cumulative(data, show_leverage=show_lev, show_individual=show_individual)
-    st.plotly_chart(fig_cum, width="stretch")
+    st.plotly_chart(fig_cum, use_container_width=True)
 
     if show_drawdown:
         fig_dd = chart_drawdown(data)
-        st.plotly_chart(fig_dd, width="stretch")
+        st.plotly_chart(fig_dd, use_container_width=True)
 
     # Performance table
     st.markdown("#### Performance Summary")
@@ -649,13 +718,14 @@ with tab1:
         'CAGR(%)': '{:.2f}', 'VOL(%)': '{:.2f}', 'MDD(%)': '{:.2f}',
         'Sharpe': '{:.4f}', 'Calmar': '{:.4f}'
     })
-    st.dataframe(display_perf, width="stretch", height=450)
+    st.dataframe(display_perf, use_container_width=True, height=450)
 
 # ── Tab 2: Annual Returns ──
 with tab2:
     equity_dict = {'BSQ 1x': data['eq_caa'], 'S&P500': data['spy_eq']}
     for name, s in data['strategies'].items():
-        equity_dict[name] = s['equity']
+        display = STRATEGY_SHORT.get(name, name)
+        equity_dict[display] = s['equity']
     for lev_name, eq_l in data['leverage_eq'].items():
         equity_dict[lev_name] = eq_l
 
@@ -671,36 +741,36 @@ with tab2:
         bar_strategies.extend(['BSQ 2x', 'BSQ 3x'])
 
     fig_annual = chart_annual_bars(annual_df, bar_strategies)
-    st.plotly_chart(fig_annual, width="stretch")
+    st.plotly_chart(fig_annual, use_container_width=True)
 
     # Table
     st.markdown("#### Annual Returns Table (%)")
     styled_annual = annual_df.style.format('{:.1f}', na_rep='—').background_gradient(
         cmap='RdYlGn', vmin=-30, vmax=30, axis=None
     )
-    st.dataframe(styled_annual, width="stretch", height=600)
+    st.dataframe(styled_annual, use_container_width=True, height=600)
 
 # ── Tab 3: Monthly Returns ──
 with tab3:
     st.markdown("#### BSQ 1x Monthly Returns (%)")
     mr_caa = monthly_returns_df(data['eq_caa'])
-    st.dataframe(style_monthly_table(mr_caa), width="stretch", height=600)
+    st.dataframe(style_monthly_table(mr_caa), use_container_width=True, height=600)
 
     if leverage_option in ['2x', 'All'] and 'BSQ 2x' in data['leverage_eq']:
         st.markdown("#### BSQ 2x Monthly Returns (%)")
         mr_2x = monthly_returns_df(data['leverage_eq']['BSQ 2x'])
-        st.dataframe(style_monthly_table(mr_2x), width="stretch", height=600)
+        st.dataframe(style_monthly_table(mr_2x), use_container_width=True, height=600)
 
     if leverage_option in ['3x', 'All'] and 'BSQ 3x' in data['leverage_eq']:
         st.markdown("#### BSQ 3x Monthly Returns (%)")
         mr_3x = monthly_returns_df(data['leverage_eq']['BSQ 3x'])
-        st.dataframe(style_monthly_table(mr_3x), width="stretch", height=600)
+        st.dataframe(style_monthly_table(mr_3x), use_container_width=True, height=600)
 
 # ── Tab 4: MP Weights History ──
 with tab4:
     st.markdown("#### Asset Allocation Over Time")
     fig_weights = chart_weights_area(data)
-    st.plotly_chart(fig_weights, width="stretch")
+    st.plotly_chart(fig_weights, use_container_width=True)
 
     st.markdown("#### Monthly Portfolio Weights (%, Downloadable)")
     w_hist = weight_history_df(data['w_caa'], data['bt_rebal'])
@@ -720,7 +790,7 @@ with tab4:
         w_display.style.format('{:.1f}').background_gradient(
             cmap='Blues', vmin=0, vmax=50, axis=None
         ),
-        width="stretch",
+        use_container_width=True,
         height=600,
     )
 
