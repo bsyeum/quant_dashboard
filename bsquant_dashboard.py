@@ -795,6 +795,93 @@ with tab4:
         height=600,
     )
 
+# ── Tab 5: Strategy Detail ──
+with tab5:
+    STRATEGY_NAMES_LIST = ['BAA', 'FAA', 'RAA', 'PAA', 'LAA', 'HAA']
+
+    selected_strategy = st.selectbox(
+        "Select Module",
+        STRATEGY_NAMES_LIST,
+        format_func=lambda x: STRATEGY_DISPLAY.get(x, x)
+    )
+
+    s = data['strategies'][selected_strategy]
+    s_perf = calc_performance(s['equity'], s['returns'], selected_strategy)
+
+    kcols = st.columns(5)
+    s_kpis = [
+        ("CAGR", f"{s_perf['CAGR(%)']:.1f}%", "positive" if s_perf['CAGR(%)'] > 0 else "negative", f"BSQ: {caa_perf['CAGR(%)']:.1f}%"),
+        ("VOL", f"{s_perf['VOL(%)']:.1f}%", "neutral", f"BSQ: {caa_perf['VOL(%)']:.1f}%"),
+        ("MDD", f"{s_perf['MDD(%)']:.1f}%", "negative", f"BSQ: {caa_perf['MDD(%)']:.1f}%"),
+        ("SHARPE", f"{s_perf['Sharpe']:.2f}", "positive" if s_perf['Sharpe'] > 1 else "neutral", f"BSQ: {caa_perf['Sharpe']:.2f}"),
+        ("CALMAR", f"{s_perf['Calmar']:.2f}", "positive" if s_perf['Calmar'] > 0.5 else "neutral", f"BSQ: {caa_perf['Calmar']:.2f}"),
+    ]
+    for col, (label, value, css_class, sub) in zip(kcols, s_kpis):
+        with col:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">{label}</div>
+                <p class="metric-value {css_class}">{value}</p>
+                <div class="metric-sub">{sub}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    fig_strat = go.Figure()
+    for name, eq, color, dash, lw in [
+        (STRATEGY_DISPLAY[selected_strategy], s['equity'], COLORS.get(selected_strategy, '#F59E0B'), None, 2.5),
+        ('BSQ 1x', data['eq_caa'], COLORS['BSQ 1x'], 'dot', 1.5),
+        ('S&P500', data['spy_eq'], COLORS['S&P500'], 'dash', 1.2),
+    ]:
+        fig_strat.add_trace(go.Scatter(
+            x=eq.index, y=eq.values, name=name, mode='lines',
+            line=dict(color=color, width=lw, dash=dash),
+        ))
+    fig_strat.update_layout(
+        **CHART_LAYOUT,
+        title=f'{STRATEGY_DISPLAY[selected_strategy]} — Cumulative Performance',
+        yaxis=dict(type='log', dtick=1, gridcolor='#E2E8F0'),
+        yaxis_title='Growth of $1 (log scale)',
+        hovermode='x unified', height=420,
+    )
+    st.plotly_chart(fig_strat, use_container_width=True)
+
+    fig_dd_strat = go.Figure()
+    for name, eq, color in [
+        (selected_strategy, s['equity'], COLORS.get(selected_strategy, '#F59E0B')),
+        ('BSQ 1x', data['eq_caa'], COLORS['BSQ 1x']),
+    ]:
+        dd = (eq / eq.cummax() - 1) * 100
+        fig_dd_strat.add_trace(go.Scatter(
+            x=dd.index, y=dd.values, name=name, mode='lines',
+            fill='tozeroy', line=dict(color=color, width=1),
+            fillcolor=_hex_to_rgba(color, 0.15),
+        ))
+    fig_dd_strat.update_layout(
+        **CHART_LAYOUT, title=f'{STRATEGY_DISPLAY[selected_strategy]} vs BSQ — Drawdown',
+        yaxis_title='Drawdown (%)', height=300, hovermode='x unified',
+    )
+    st.plotly_chart(fig_dd_strat, use_container_width=True)
+
+    st.markdown(f"#### {STRATEGY_DISPLAY[selected_strategy]} Monthly Returns (%)")
+    mr_strat = monthly_returns_df(s['equity'])
+    st.dataframe(style_monthly_table(mr_strat), use_container_width=True, height=500)
+
+    st.markdown(f"#### {STRATEGY_DISPLAY[selected_strategy]} Weight History (%)")
+    w_strat = s['weights'].loc[s['weights'].index.isin(data['bt_rebal'])].copy()
+    w_strat = w_strat[CORE_ASSETS].fillna(0)
+    w_strat = (w_strat * 100).round(1)
+    w_strat.index = w_strat.index.strftime('%Y-%m')
+    w_strat.index.name = 'Date'
+    st.dataframe(
+        w_strat.iloc[::-1].style.format('{:.1f}').background_gradient(
+            cmap='Blues', vmin=0, vmax=50, axis=None
+        ),
+        use_container_width=True, height=500,
+    )
+
+
 
 # ─── FOOTER ───
 st.markdown(f"""
