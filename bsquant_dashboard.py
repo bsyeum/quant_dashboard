@@ -557,7 +557,6 @@ def chart_annual_bars(annual_df, strategies_to_show):
 
 
 def style_monthly_table(df):
-    """Color-code monthly returns with blue gradient."""
     return df.style.format('{:.1f}', na_rep='—').background_gradient(
         cmap='RdBu', vmin=-8, vmax=8, axis=None
     )
