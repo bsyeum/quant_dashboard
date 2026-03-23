@@ -557,20 +557,10 @@ def chart_annual_bars(annual_df, strategies_to_show):
 
 
 def style_monthly_table(df):
-    """Color-code monthly returns: green for positive, red for negative."""
-    def color_cell(val):
-        if pd.isna(val):
-            return 'color: #CBD5E1; background-color: #F8FAFC;'
-        elif val > 0:
-            intensity = min(abs(val) / 8.0, 1.0)
-            return f'color: #064E3B; background-color: rgba(16, 185, 129, {0.08 + intensity * 0.3});'
-        elif val < 0:
-            intensity = min(abs(val) / 8.0, 1.0)
-            return f'color: #7F1D1D; background-color: rgba(239, 68, 68, {0.08 + intensity * 0.3});'
-        else:
-            return 'color: #64748B; background-color: #FFFFFF;'
-    return df.style.applymap(color_cell).format('{:.1f}', na_rep='—')
-
+    """Color-code monthly returns with blue gradient."""
+    return df.style.format('{:.1f}', na_rep='—').background_gradient(
+        cmap='RdBu', vmin=-8, vmax=8, axis=None
+    )
 
 # ─── SIDEBAR ───
 with st.sidebar:
